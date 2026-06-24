@@ -1,10 +1,27 @@
 import { anthropic, MOVIE_AI_MODEL } from "@/lib/anthropic";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const { type, name, description, style, duration } = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const { type, name, description, style, duration } = body;
+
+  if (!type || !name || !description) {
+    return new Response(
+      JSON.stringify({ error: "Missing required fields: type, name, or description" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
   const prompt = buildGenerationPrompt({ type, name, description, style, duration });
 
@@ -12,30 +29,40 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const messageStream = anthropic.messages.stream({
-        model: MOVIE_AI_MODEL,
-        max_tokens: 16000,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        thinking: { type: "adaptive" } as any,
-        system: `You are CineAI, an expert AI content director. Generate comprehensive, production-ready content plans with vivid scene descriptions, dialogue, and technical direction. Structure your output with clear sections using markdown headers.`,
-        messages: [{ role: "user", content: prompt }],
-      });
+      try {
+        const messageStream = anthropic.messages.stream({
+          model: MOVIE_AI_MODEL,
+          max_tokens: 16000,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          thinking: { type: "adaptive" } as any,
+          system: `You are CineAI, an expert AI content director. Generate comprehensive, production-ready content plans with vivid scene descriptions, dialogue, and technical direction. Structure your output with clear sections using markdown headers.`,
+          messages: [{ role: "user", content: prompt }],
+        });
 
-      for await (const event of messageStream) {
-        if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta"
-        ) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ text: event.delta.text })}\n\n`
-            )
-          );
+        for await (const event of messageStream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ text: event.delta.text })}\n\n`
+              )
+            );
+          }
         }
-      }
 
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      } catch (error) {
+        console.error("Stream error:", error);
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ error: "An error occurred during generation" })}\n\n`
+          )
+        );
+      } finally {
+        controller.close();
+      }
     },
   });
 

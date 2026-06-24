@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Play, Film, Music, Tv, BookOpen, Clapperboard, Video, Star, Clock, Eye, Search } from "lucide-react";
 
 const categories = [
@@ -118,6 +118,16 @@ export default function WatchPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<typeof mockContent[0] | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedVideo(null);
+    };
+    if (selectedVideo) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedVideo]);
 
   const filtered = mockContent.filter((c) => {
     const matchesCategory = activeCategory === "all" || c.type === activeCategory;

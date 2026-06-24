@@ -97,36 +97,44 @@ function GenerateContent() {
 
       if (!res.ok) throw new Error("Failed to connect to AI");
 
-      const reader = res.body!.getReader();
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Failed to get response reader");
       const decoder = new TextDecoder();
       let fullText = "";
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
+          const trimmedLine = line.trim();
+          if (trimmedLine.startsWith("data: ")) {
+            const data = trimmedLine.slice(6).trim();
             if (data === "[DONE]") break;
+            let parsed;
             try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                fullText += parsed.text;
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: "assistant",
-                    content: fullText,
-                  };
-                  return updated;
-                });
-              }
+              parsed = JSON.parse(data);
             } catch {
-              // skip malformed chunks
+              continue;
+            }
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+            if (parsed.text) {
+              fullText += parsed.text;
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  role: "assistant",
+                  content: fullText,
+                };
+                return updated;
+              });
             }
           }
         }
@@ -138,7 +146,7 @@ function GenerateContent() {
           updated[updated.length - 1] = {
             role: "assistant",
             content:
-              "I encountered an error. Please check that your ANTHROPIC_API_KEY is set and try again.",
+              err.message || "I encountered an error. Please check that your ANTHROPIC_API_KEY is set and try again.",
           };
           return updated;
         });

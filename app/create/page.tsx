@@ -236,7 +236,7 @@ export default function CreatePage() {
 
               <button
                 onClick={() => setStep(3)}
-                disabled={!projectName}
+                disabled={!projectName.trim()}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-lg hover:from-purple-500 hover:to-pink-500 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <Wand2 className="w-5 h-5" />
@@ -296,7 +296,7 @@ export default function CreatePage() {
                 </div>
               </div>
               <Link
-                href={`/generate?type=${selectedType}&name=${encodeURIComponent(projectName)}&desc=${encodeURIComponent(projectDescription)}`}
+                href={`/generate?type=${selected.id}&name=${encodeURIComponent(projectName)}&desc=${encodeURIComponent(projectDescription)}`}
                 className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold hover:from-purple-500 hover:to-pink-500 transition-all"
               >
                 <Sparkles className="w-5 h-5" />
